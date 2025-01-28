@@ -145,18 +145,18 @@ void compute_using_pthreads_v1(float *x, float *y, float a, int num_elements, in
     int i;
     main_thread = pthread_self();
     printf("Main thread = %lu is creating %d worker threads\n", main_thread, num_threads);
-	int diff = num_elements % num_threads;
+	int diff = num_elements / num_threads;
     /* Fork point: create worker threads and ask them to execute worker that takes a structure as an argument */
     for (i = 0; i < num_threads; i++) {
         args_for_thread = (ARGS_FOR_THREAD *)malloc(sizeof(ARGS_FOR_THREAD)); /* Memory for structure to pack the arguments */
         args_for_thread->tid = i; /* Fill the structure with some dummy arguments */
         args_for_thread->arg1 = x; 
         args_for_thread->arg2 = y;
-        args_for_thread->arg3 = diff;
+        args_for_thread->arg3 = diff; 
         args_for_thread->arg4 = diff*i;
         args_for_thread->processing_time = 10 * (float)rand()/RAND_MAX; 
 		
-        if ((pthread_create(&worker_thread[i], NULL, compute_gold_with_start, (void *)args_for_thread)) != 0) {
+        if ((pthread_create(&worker_thread[i], NULL, (void *)compute_gold_with_start, (void *)args_for_thread)) != 0) {
             perror("pthread_create");
             exit(EXIT_FAILURE);
         }
