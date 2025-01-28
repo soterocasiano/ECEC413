@@ -120,6 +120,19 @@ void compute_gold_with_start(float *x, float *y, float a, int num_elements, int 
         y[i] = a * x[i] + y[i];
 }
 
+/* Function prototype for the thread routines */
+void *worker(void *);
+
+/* Structure used to pass arguments to the worker threads*/
+typedef struct args_for_thread_t {
+    int tid;                /* Thread ID */
+    float* arg1;               /* First argument */
+    float* arg2;             /* Second argument */
+    int arg3;             /* Second argument */
+    int arg4;
+    int processing_time;    /* Third argument */
+} ARGS_FOR_THREAD; 
+
 
 /* Calculate SAXPY using pthreads, version 1. Place result in the Y vector */
 void compute_using_pthreads_v1(float *x, float *y, float a, int num_elements, int num_threads)
@@ -132,14 +145,14 @@ void compute_using_pthreads_v1(float *x, float *y, float a, int num_elements, in
     int i;
     main_thread = pthread_self();
     printf("Main thread = %lu is creating %d worker threads\n", main_thread, num_threads);
-	
+	int diff = num_elements % num_threads;
     /* Fork point: create worker threads and ask them to execute worker that takes a structure as an argument */
     for (i = 0; i < num_threads; i++) {
         args_for_thread = (ARGS_FOR_THREAD *)malloc(sizeof(ARGS_FOR_THREAD)); /* Memory for structure to pack the arguments */
         args_for_thread->tid = i; /* Fill the structure with some dummy arguments */
         args_for_thread->arg1 = x; 
         args_for_thread->arg2 = y;
-        args_for_thread->arg3 = num_elements % num_threads;
+        args_for_thread->arg3 = diff;
         args_for_thread->arg4 = diff*i;
         args_for_thread->processing_time = 10 * (float)rand()/RAND_MAX; 
 		
@@ -158,7 +171,6 @@ void compute_using_pthreads_v1(float *x, float *y, float a, int num_elements, in
     printf("Main thread exiting\n");
     pthread_exit((void *)main_thread);
     pthread_t ptid = 0; 
-    int diff = num_elements % num_threads;
 }
 
 /* Calculate SAXPY using pthreads, version 2. Place result in the Y vector */
