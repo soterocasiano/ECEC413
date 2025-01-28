@@ -126,10 +126,10 @@ void *worker(void *);
 /* Structure used to pass arguments to the worker threads*/
 typedef struct args_for_thread_t {
     int tid;                /* Thread ID */
-    float* arg1;               /* First argument */
-    float* arg2;             /* Second argument */
-    int arg3;             /* Second argument */
-    int arg4;
+    float* arg1;               /* x */
+    float* arg2;             /* y */
+    int arg3;             /* num_elements % num_threads */
+    int arg4;              /* starting i */
     int processing_time;    /* Third argument */
 } ARGS_FOR_THREAD; 
 
