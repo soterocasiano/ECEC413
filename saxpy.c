@@ -113,12 +113,28 @@ void compute_gold(float *x, float *y, float a, int num_elements)
         y[i] = a * x[i] + y[i]; 
 }
 
+void compute_gold_with_start(float *x, float *y, float a, int num_elements, int start)
+{
+	int i;
+    for (int i = start; i < num_elements; i++)
+        y[i] = a * x[i] + y[i];
+}
+
+
 /* Calculate SAXPY using pthreads, version 1. Place result in the Y vector */
 void compute_using_pthreads_v1(float *x, float *y, float a, int num_elements, int num_threads)
 {
-    pthread_t ptid; 
-    for(i = 0; i < num_threads; i++) {
-        
+    pthread_t ptid = 0; 
+    int diff = num_elements % num_threads;
+    for(int i = 0; i < num_threads; i++) {
+        pthread_create(i, NULL, compute_using_pthreads_v1, (x, y, a, num_elements % num_threads, diff*ptid));
+        ptid++;
+    }
+    for(int i = 0; i < num_threads; i++) {
+        pthread_join(i, NULL);
+    }
+    for (int i = 0; i < num_elements; i++) {
+        printf("%.6f", y[i]);
     }
 }
 
