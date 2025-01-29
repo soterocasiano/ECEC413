@@ -5,7 +5,7 @@
  * Author: Naga Kandasamy
  * Date modified: January 23, 2025 
  *
- * Student names: Sotero Casiano
+ * Student names: Sotero Casiano, Jeffrey Lau
  * Date: 1/28/2025
  *
  * */
@@ -15,6 +15,19 @@
 #include <sys/time.h>
 #include <math.h>
 #include <pthread.h>
+
+/* Structure used to pass arguments to the worker threads*/
+typedef struct args_for_thread {
+    int tid;                /* Thread ID */
+    float* x;               /* x */
+    float* y;             /* y */
+    float a;                /* Scalar value*/
+    int chunk_size;             /* num_elements % num_threads */
+    int stride_start;              /* starting i */
+    int processing_time;    /* Third argument */
+    int num_threads;         /* Number of threads*/
+    int num_elements;       /* Number of elements*/
+} args_for_thread_t;
 
 /* Function prototypes */
 void compute_gold(float *, float *, float, int);
@@ -113,50 +126,52 @@ void compute_gold(float *x, float *y, float a, int num_elements)
         y[i] = a * x[i] + y[i]; 
 }
 
-void compute_gold_with_start(float *x, float *y, float a, int num_elements, int start)
+void *compute_gold_with_chunking(void *args)
 {
+    args_for_thread_t *thread_data = (args_for_thread_t *)args;
 	int i;
-    for (int i = start; i < num_elements; i++)
-        y[i] = a * x[i] + y[i];
+
+    if (thread_data->tid < (thread_data->num_threads - 1)){
+        for (i = thread_data->tid * thread_data->chunk_size; i < (thread_data->tid + 1) * thread_data->chunk_size; i++)
+            thread_data->y[i] = thread_data->a * thread_data->x[i] + thread_data->y[i];
+    }
+    else{
+        for (i = thread_data->tid * thread_data->chunk_size; i < thread_data->num_elements; i++)
+            thread_data->y[i] = thread_data->a * thread_data->x[i] + thread_data->y[i];
+    }
+
+    /* Free data structures */
+    free((void *)thread_data);
+    pthread_exit(NULL);
 }
 
 /* Function prototype for the thread routines */
-void *worker(void *);
-
-/* Structure used to pass arguments to the worker threads*/
-typedef struct args_for_thread_t {
-    int tid;                /* Thread ID */
-    float* arg1;               /* x */
-    float* arg2;             /* y */
-    int arg3;             /* num_elements % num_threads */
-    int arg4;              /* starting i */
-    int processing_time;    /* Third argument */
-} ARGS_FOR_THREAD; 
+//void *worker(void *);
 
 
 /* Calculate SAXPY using pthreads, version 1. Place result in the Y vector */
 void compute_using_pthreads_v1(float *x, float *y, float a, int num_elements, int num_threads)
 {
-    pthread_t main_thread;
     /* Allocate memory to store the IDs of the worker threads */
     pthread_t *worker_thread = (pthread_t *)malloc(num_threads * sizeof(pthread_t));
-    ARGS_FOR_THREAD *args_for_thread;
+    args_for_thread_t *args_for_thread;
 	
     int i;
-    main_thread = pthread_self();
-    printf("Main thread = %lu is creating %d worker threads\n", main_thread, num_threads);
-	int diff = num_elements / num_threads;
+	int diff = floor(num_elements / num_threads);
     /* Fork point: create worker threads and ask them to execute worker that takes a structure as an argument */
     for (i = 0; i < num_threads; i++) {
-        args_for_thread = (ARGS_FOR_THREAD *)malloc(sizeof(ARGS_FOR_THREAD)); /* Memory for structure to pack the arguments */
+        args_for_thread = (args_for_thread_t *)malloc(sizeof(args_for_thread_t)); /* Memory for structure to pack the arguments */
         args_for_thread->tid = i; /* Fill the structure with some dummy arguments */
-        args_for_thread->arg1 = x; 
-        args_for_thread->arg2 = y;
-        args_for_thread->arg3 = diff; 
-        args_for_thread->arg4 = diff*i;
-        args_for_thread->processing_time = 10 * (float)rand()/RAND_MAX; 
+        args_for_thread->x = x; 
+        args_for_thread->y = y;
+        args_for_thread->a = a;
+        args_for_thread->chunk_size = diff; 
+        args_for_thread->stride_start = diff*i;
+        args_for_thread->processing_time = 10 * (float)rand()/RAND_MAX;
+        args_for_thread->num_threads = num_threads;
+        args_for_thread->num_elements = num_elements;
 		
-        if ((pthread_create(&worker_thread[i], NULL, (void *)compute_gold_with_start, (void *)args_for_thread)) != 0) {
+        if ((pthread_create(&worker_thread[i], NULL, compute_gold_with_chunking, (void *)args_for_thread)) != 0) {
             perror("pthread_create");
             exit(EXIT_FAILURE);
         }
@@ -166,11 +181,6 @@ void compute_using_pthreads_v1(float *x, float *y, float a, int num_elements, in
     for (i = 0; i < num_threads; i++)
         pthread_join(worker_thread[i], NULL);
 		
-    /* Free data structures */
-    free((void *)worker_thread);
-    printf("Main thread exiting\n");
-    pthread_exit((void *)main_thread);
-    pthread_t ptid = 0; 
 }
 
 /* Calculate SAXPY using pthreads, version 2. Place result in the Y vector */
