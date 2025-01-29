@@ -23,8 +23,6 @@ typedef struct args_for_thread {
     float* y;             /* y */
     float a;                /* Scalar value*/
     int chunk_size;             /* num_elements % num_threads */
-    int stride_start;              /* starting i */
-    int processing_time;    /* Third argument */
     int num_threads;         /* Number of threads*/
     int num_elements;       /* Number of elements*/
 } args_for_thread_t;
@@ -166,8 +164,6 @@ void compute_using_pthreads_v1(float *x, float *y, float a, int num_elements, in
         args_for_thread->y = y;
         args_for_thread->a = a;
         args_for_thread->chunk_size = diff; 
-        args_for_thread->stride_start = diff*i;
-        args_for_thread->processing_time = 10 * (float)rand()/RAND_MAX;
         args_for_thread->num_threads = num_threads;
         args_for_thread->num_elements = num_elements;
 		
@@ -183,10 +179,50 @@ void compute_using_pthreads_v1(float *x, float *y, float a, int num_elements, in
 		
 }
 
+void *compute_gold_with_striding(void *args)
+{
+    args_for_thread_t *thread_data = (args_for_thread_t *)args;
+    int tid = thread_data->tid;
+
+    while (tid < thread_data->num_elements){
+        thread_data->y[tid] = thread_data->a * thread_data->x[tid] + thread_data->y[tid];
+        tid = tid + thread_data->num_threads;
+    }
+
+    /* Free data structures */
+    free((void *)thread_data);
+    pthread_exit(NULL);
+}
+
 /* Calculate SAXPY using pthreads, version 2. Place result in the Y vector */
 void compute_using_pthreads_v2(float *x, float *y, float a, int num_elements, int num_threads)
 {
-    /* FIXME: Complete this function */
+    /* Allocate memory to store the IDs of the worker threads */
+    pthread_t *worker_thread = (pthread_t *)malloc(num_threads * sizeof(pthread_t));
+    args_for_thread_t *args_for_thread;
+	
+    int i;
+
+    /* Fork point: create worker threads and ask them to execute worker that takes a structure as an argument */
+    for (i = 0; i < num_threads; i++) {
+        args_for_thread = (args_for_thread_t *)malloc(sizeof(args_for_thread_t)); /* Memory for structure to pack the arguments */
+        args_for_thread->tid = i; /* Fill the structure with some dummy arguments */
+        args_for_thread->x = x; 
+        args_for_thread->y = y;
+        args_for_thread->a = a;
+        args_for_thread->chunk_size = 1; 
+        args_for_thread->num_threads = num_threads;
+        args_for_thread->num_elements = num_elements;
+		
+        if ((pthread_create(&worker_thread[i], NULL, compute_gold_with_striding, (void *)args_for_thread)) != 0) {
+            perror("pthread_create");
+            exit(EXIT_FAILURE);
+        }
+    }
+		  
+    /* Join point: wait for all the worker threads to finish */
+    for (i = 0; i < num_threads; i++)
+        pthread_join(worker_thread[i], NULL);
 }
 
 /* Perform element-by-element check of vector if relative error is within specified threshold */
