@@ -11,8 +11,8 @@
  * Author: Naga Kandasamy
  * Date modified: January 31, 2025 
  *
- * Student/team: FIXME
- * Date: FIXME
+ * Student/team: Sotero Casiano, Jeffrey Lau
+ * Date: February 11, 2025
  */  
 #include <stdio.h>
 #include <stdlib.h>
