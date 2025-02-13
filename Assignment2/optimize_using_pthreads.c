@@ -82,18 +82,18 @@ int solve_optimize_using_pthreads(char *function, int dim, swarm_t *swarm,
     while (iter < num_iter) {
         // Create threads
         for (i = 0; i < num_threads; i++) {
-            thread_data[i].start = i * particles_per_thread;
-            thread_data[i].end = (i == num_threads - 1) ? swarm->num_particles : (i + 1) * particles_per_thread;
+            thread_data[i].start = i * particles_per_thread;    // Particles per thread
+            thread_data[i].end = (i == num_threads - 1) ? swarm->num_particles : (i + 1) * particles_per_thread; // Ternary operation to account for all particles in swarm 
             thread_data[i].swarm = swarm;
-            thread_data[i].w = 0.79;
-            thread_data[i].c1 = 1.49;
-            thread_data[i].c2 = 1.49;
-            thread_data[i].xmin = xmin;
-            thread_data[i].xmax = xmax;
-            thread_data[i].iter = iter;
-            thread_data[i].function = function;
+            thread_data[i].w = 0.79;        // Defined in assignment overview
+            thread_data[i].c1 = 1.49;       // Defined in assignment overview
+            thread_data[i].c2 = 1.49;       // Defined in assignment overview
+            thread_data[i].xmin = xmin;     // Given by user
+            thread_data[i].xmax = xmax;     // Given by user
+            thread_data[i].iter = iter;     // Given by user
+            thread_data[i].function = function;     // Maintain tracking of function
 
-            pthread_create(&threads[i], NULL, particle_update, (void *)&thread_data[i]);
+            pthread_create(&threads[i], NULL, particle_update, (void *)&thread_data[i]);    // Call the particle update function for each thread
         }
 
         // Join threads
@@ -114,7 +114,7 @@ optimize_using_pthreads(char *function, int dim, int swarm_size,
      /* Initialize PSO */
     swarm_t *swarm;
     srand(time(NULL));
-    swarm = pso_init(function, dim, swarm_size, xmin, xmax);
+    swarm = pso_init(function, dim, swarm_size, xmin, xmax); // Initialize the swarm
     if (swarm == NULL) {
         fprintf(stderr, "Unable to initialize PSO\n");
         exit(EXIT_FAILURE);
@@ -126,10 +126,10 @@ optimize_using_pthreads(char *function, int dim, int swarm_size,
 
     /* Solve PSO */
     int g; 
-    g = solve_optimize_using_pthreads(function, dim, swarm, xmax, xmin, num_iter, num_threads);
+    g = solve_optimize_using_pthreads(function, dim, swarm, xmax, xmin, num_iter, num_threads); // Call our pthreaded implementation
     if (g >= 0) {
         fprintf(stderr, "Solution:\n");
-        pso_print_particle(&swarm->particle[g]);
+        pso_print_particle(&swarm->particle[g]); // Print the particle before returning
     }
 
     pso_free(swarm);
