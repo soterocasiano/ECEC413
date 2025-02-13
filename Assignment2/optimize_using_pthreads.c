@@ -21,7 +21,7 @@ typedef struct {
     double w, c1, c2;   // PSO parameters
     double xmin, xmax;  // Position bounds
     int iter;           // Current iteration
-    char* function;
+    char* function;     // function string
 } ThreadData;
 
 
