@@ -17,6 +17,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "pso.h"
+#include <sys/time.h>
+#include <math.h>
 
 int main(int argc, char **argv)
 {
@@ -47,11 +49,17 @@ int main(int argc, char **argv)
         exit (EXIT_FAILURE);
     }
 
+    struct timeval start, stop;	
+	gettimeofday(&start, NULL);
     /* FIXME: Complete this function to perform PSO using pthreads. 
      * Return -1 on error, 0 on success. Print best-performing 
      * particle within the function prior to returning. 
      */
     status = optimize_using_pthreads(function, dim, swarm_size, xmin, xmax, max_iter, num_threads);
+    gettimeofday(&stop, NULL);
+    fprintf(stderr, "Execution time = %fs\n", (float)(stop.tv_sec - start.tv_sec\
+        + (stop.tv_usec - start.tv_usec)/(float)1000000));
+        
     if (status < 0) {
         fprintf(stderr, "Error optimizing function using pthreads\n");
         exit (EXIT_FAILURE);
