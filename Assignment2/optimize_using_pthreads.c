@@ -25,7 +25,7 @@ typedef struct {
 } ThreadData;
 
 
-void *particle_update(void *arg) {
+void *update_swarm(void *arg) {
     ThreadData *data = (ThreadData *)arg; // cast arg to threaddata
     int i, j, g;
     float best_fitness = INFINITY;
@@ -103,7 +103,7 @@ int solve_optimize_using_pthreads(char *function, int dim, swarm_t *swarm,
             thread_data[i].iter = iter;     // Given by user
             thread_data[i].function = function;     // Maintain tracking of function
 
-            pthread_create(&threads[i], NULL, particle_update, (void *)&thread_data[i]);    // Call the particle update function for each thread
+            pthread_create(&threads[i], NULL, update_swarm, (void *)&thread_data[i]);    // Call the particle update function for each thread
         }
 
         // Join threads
