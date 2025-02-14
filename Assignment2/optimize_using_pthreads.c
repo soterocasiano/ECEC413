@@ -27,7 +27,8 @@ typedef struct {
 
 void *particle_update(void *arg) {
     ThreadData *data = (ThreadData *)arg; // cast arg to threaddata
-    int i, j;
+    int i, j, g;
+    float best_fitness = INFINITY;
     particle_t *particle, *gbest; // init particles
     float r1, r2, curr_fitness;
 
@@ -53,6 +54,7 @@ void *particle_update(void *arg) {
             if (particle->x[j] > data->xmax) particle->x[j] = data->xmax;
             if (particle->x[j] < data->xmin) particle->x[j] = data->xmin;
         }
+        
 
         // Evaluate fitness
         pso_eval_fitness(data->function, particle, &curr_fitness);
@@ -64,6 +66,13 @@ void *particle_update(void *arg) {
                 particle->pbest[j] = particle->x[j];
             }
         }
+
+        g = -1;
+        if (particle->fitness < best_fitness) {
+            best_fitness = particle->fitness;
+            particle->g = i;
+        }
+
     }
 
     pthread_exit(NULL);
@@ -106,6 +115,8 @@ int solve_optimize_using_pthreads(char *function, int dim, swarm_t *swarm,
 
     free(threads);
     free(thread_data);
+
+    return swarm->particle->g;
 }
 
 optimize_using_pthreads(char *function, int dim, int swarm_size, 
