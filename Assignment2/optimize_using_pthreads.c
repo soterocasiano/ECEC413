@@ -70,7 +70,8 @@ void *particle_update(void *arg) {
         g = -1;
         if (particle->fitness < best_fitness) {
             best_fitness = particle->fitness;
-            particle->g = i;
+            g = i;
+            particle->g = g;
         }
 
     }
@@ -119,7 +120,7 @@ int solve_optimize_using_pthreads(char *function, int dim, swarm_t *swarm,
     return swarm->particle->g;
 }
 
-optimize_using_pthreads(char *function, int dim, int swarm_size, 
+int optimize_using_pthreads(char *function, int dim, int swarm_size, 
     float xmin, float xmax, int num_iter, int num_threads)
 {
      /* Initialize PSO */
