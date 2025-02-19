@@ -4,8 +4,8 @@
  * Author: Naga Kandasamy
  * Date modified: February 13, 2025
  *
- * Student name(s): FIXME
- * Date modified: FIXME
+ * Student name(s): Jeffrey Lau, Sotero Casiano
+ * Date modified: 2/19/2025
  *
  * Build as follosw: make clean && make
 */
@@ -15,6 +15,7 @@
 #include <time.h>
 #include <string.h>
 #include <math.h>
+#include <sys/time.h>
 #include "jacobi_solver.h"
 
 /* Uncomment the line below to spit out debug information */ 
@@ -63,21 +64,37 @@ int main(int argc, char **argv)
     /* Compute Jacobi solution using reference code */
     fprintf(stderr, "**************\n");
 	fprintf(stderr, "Generating solution using reference\n");
+	struct timeval start, stop;	
+	gettimeofday(&start, NULL);
     compute_gold(A, reference_x, B, max_iter);
+	gettimeofday(&stop, NULL);
+    fprintf(stderr, "Gold Execution time = %fs\n", (float)(stop.tv_sec - start.tv_sec\
+        + (stop.tv_usec - start.tv_usec)/(float)1000000));
+
     display_jacobi_solution(A, reference_x, B); /* Display statistics */
     fprintf(stderr, "**************\n");
 	
 	/* Compute Jacobi solution using AVX. Return solution in avx_solution_x. */
     fprintf(stderr, "**************\n");
     fprintf(stderr, "Generating solution using AVX\n");
+	gettimeofday(&start, NULL);
 	compute_using_avx(A, avx_solution_x, B, max_iter);
+	gettimeofday(&stop, NULL);
+    fprintf(stderr, "AVX Execution time = %fs\n", (float)(stop.tv_sec - start.tv_sec\
+        + (stop.tv_usec - start.tv_usec)/(float)1000000));
+
     display_jacobi_solution(A, avx_solution_x, B); /* Display statistics */
     fprintf(stderr, "**************\n");
     	
 	/* Compute Jacobi solution using pthreads. Return solution in pthread_solution_x. */
     fprintf(stderr, "**************\n");
     fprintf(stderr, "Generating solution using pthreads + AVX\n");
+	gettimeofday(&start, NULL);
 	compute_using_pthread_avx(A, pthread_avx_solution_x, B, max_iter, num_threads);
+	gettimeofday(&stop, NULL);
+    fprintf(stderr, "Pthreads AVX Execution time = %fs\n", (float)(stop.tv_sec - start.tv_sec\
+        + (stop.tv_usec - start.tv_usec)/(float)1000000));
+
     display_jacobi_solution(A, pthread_avx_solution_x, B); /* Display statistics */
     fprintf(stderr, "**************\n");
 
