@@ -35,19 +35,33 @@ void compute_using_avx(const matrix_t A, matrix_t avx_solution_x, const matrix_t
     int done = 0;
     double ssd, mse;
     int num_iter = 0;
-    __m256 sum = _mm256_setzero_ps();
-    __m256 a, b;
+
+    __m256 a, b, x, tmp;
 
     while (!done) {
         // AVX in this loop?
-        for (i = 0; i < num_cols; i++) {
-            double sum = -A.elements[i * num_cols + i] * src[i];
-            for (j = 0; j < num_cols; j++) {
-                sum += A.elements[i * num_cols + j] * src[j];
+        for (i = 0; i < num_chunks; i++) {
+            //double sum = -A.elements[i * num_cols + i] * src[i];
+            __m256 sum = _mm256_setzero_ps();
+            for (j = 0; j < num_chunks; j++) {
+                if (i == j)
+                    continue;
+                else{
+                    a = _mm256_set1_ps(A.elements[i * num_chunks + j]);
+                    x = _mm256_load_ps(&src[VECTOR_SIZE * j]);
+                    tmp = _mm256_mul_ps(a, x);
+                    sum = _mm256_add_ps(sum, tmp);
+                    //sum += A.elements[i * num_cols + j] * src[j];
+                }
             }
            
             /* Update values for the unkowns for the current row. */
-            dest[i] = (B.elements[i] - sum)/A.elements[i * num_cols + i];
+            b = _mm256_set1_ps(B.elements[i]);
+            a = _mm256_set1_ps(A.elements[i * num_cols + i]);
+            tmp = _mm256_sub_ps(b, sum);
+            tmp = _mm256_div_ps(tmp, a);
+            _mm256_store_ps(&dest[VECTOR_SIZE * i], tmp);
+            //dest[i] = (B.elements[i] - sum)/A.elements[i * num_cols + i];
         }
 
         /* Check for convergence and update the unknowns. */

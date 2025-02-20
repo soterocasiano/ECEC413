@@ -20,6 +20,7 @@ int check_if_diagonal_dominant(const matrix_t);
 matrix_t create_diagonally_dominant_matrix(int, int);
 void compute_using_avx(const matrix_t, matrix_t, const matrix_t, int max_iter);
 void compute_using_pthread_avx(const matrix_t, matrix_t, const matrix_t, int max_iter, int num_threads);
+void *iterative_jacobian(void *args);
 void print_matrix(const matrix_t);
 float get_random_number(int, int);
 
