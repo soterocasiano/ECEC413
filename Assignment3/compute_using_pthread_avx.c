@@ -14,146 +14,127 @@
 #define VECTOR_SIZE 8 /* AVX operates on 8 single-precision floating-point values */
 
 /* Data structure defining what to pass to each worker thread */
-typedef struct thread_data_s {
-    int tid;                        /* The thread ID: 0, 1, ... */
-    int num_threads;                /* Number of threads in the pool */
-    int max_iter;           
-    matrix_t A;                     /* Matrix A */
-    matrix_t X;                /* Matrix X */
-    matrix_t B;
-    int offset;                     /* Starting offset for each thread within the vectors. Offsets are specified in terms of mini chunks */ 
-    int num_mini_chunks;            /* Number of mini chunks assigned to each thread. Each mini chunk consists of 8 floating point elements */
-    double ssd;                     /* Address of the shared variable for the sum */
-    pthread_mutex_t *mutex_for_ssd; /* Location of lock variable protecting sum */
-} thread_data_t;
+typedef struct {
+    int start_row; // where to start
+    int end_row; // where to end
+    int num_cols; // number of columns
+    float *A_elements; // vector A
+    float *src; // src vector
+    float *dest; // unknowns vector
+    float *B_elements; // vecot B
+} ThreadData;
 
 /* FIXME: Complete this function to perform the Jacobi calculation using pthreads + AVX.
  * Result must be placed in pthread_avx_solution_x. */
 void compute_using_pthread_avx(const matrix_t A, matrix_t pthread_avx_solution_x, const matrix_t B, int max_iter, int num_threads)
 {
 
-    pthread_t *thread_id = (pthread_t *)malloc(num_threads * sizeof(pthread_t));                /* Data structure to store thread IDs */
-    pthread_attr_t attributes;                                                                  /* Thread attributes */
-    pthread_attr_init(&attributes);                                                             /* Initialize thread attributes with default values */
-
-    float ssd = 0.0;                                                                            /* Shared variable for ssd */
-    pthread_mutex_t mutex_for_ssd;                                                              /* Lock for the shared variable ssd */
-    pthread_mutex_init(&mutex_for_ssd, NULL);                                                   /* Initialize the mutex */
-
-    /* Fork point: Allocate heap memory for required data structures and create the worker threads */
     int i;
-    thread_data_t *thread_data = (thread_data_t *)malloc(sizeof(thread_data_t) * num_threads);
-    int num_mini_chunks_per_thread = (A.num_rows/VECTOR_SIZE)/num_threads;                    /* Calculate number of mini chunks, in size of 8 elements, to assign to each thread */
-    //printf("Assigning %d mini chunks to each thread\n", num_mini_chunks_per_thread);
-    
-    for (i = 0; i < num_threads; i++) {
-        thread_data[i].tid = i; 
-        thread_data[i].num_threads = num_threads;
-        thread_data[i].max_iter = max_iter; 
-        thread_data[i].A = A; 
-        thread_data[i].B = B;
-        thread_data[i].X = pthread_avx_solution_x;
-        thread_data[i].offset = i * num_mini_chunks_per_thread;                             /* Calculate the offset for each thread, in terms of mini chnks (eight elements each) */ 
-        thread_data[i].num_mini_chunks = num_mini_chunks_per_thread;
-        thread_data[i].ssd = ssd;
-        thread_data[i].mutex_for_ssd = &mutex_for_ssd;
-    }
+    int num_rows = A.num_rows;
+    int num_cols = A.num_columns;
+    /* Allocate n x 1 matrix to hold iteration values. */
+    matrix_t new_x = allocate_matrix(num_rows, 1, 0);
 
-    for (i = 0; i < num_threads; i++)
-        pthread_create(&thread_id[i], &attributes, iterative_jacobian, (void *)&thread_data[i]);
-					 
-    /* Join point: wait for the workers to finish */
-    for (i = 0; i < num_threads; i++)
-        pthread_join(thread_id[i], NULL);
-		 
-    /* Free dynamically allocated data structures */
-    free((void *)thread_data);
-}
-
-void *iterative_jacobian(void *args)
-{
-    thread_data_t *thread_data = (thread_data_t *)args;                                 /* Typecast argument to pointer to thread_data_t structure */
-
-    int i, j, k;
-    int num_rows = thread_data->A.num_rows;
-    int num_cols = thread_data->A.num_columns;
-
-    /* Allocate n x 1 matrix to hold iteration values.*/
-    matrix_t new_x = allocate_matrix(num_rows, 1, 0);      
-    
-    /* Initialize current jacobi solution. */
+    /* Initialize current Jacobi solution. */
     for (i = 0; i < num_rows; i++)
-        thread_data->X.elements[i] = thread_data->B.elements[i];
+    pthread_avx_solution_x.elements[i] = B.elements[i];
 
     /* Setup the ping-pong buffers */
-    float *src = thread_data->X.elements;
+    float *src = pthread_avx_solution_x.elements;
     float *dest = new_x.elements;
     float *temp;
 
-    /* Perform Jacobi iteration. */
+    pthread_t threads[num_threads];
+    ThreadData thread_data[num_threads];
     int done = 0;
     double ssd, mse;
     int num_iter = 0;
-    ssd = 0.0; 
-    __m256 a, b, x, tmp;
 
     while (!done) {
-        k = thread_data->tid;
-        while (k < thread_data->num_mini_chunks){
-            for (i = 0; i < thread_data->num_mini_chunks; i++) {
-                //double sum = -A.elements[i * num_cols + i] * src[i];
-                __m256 sum = _mm256_setzero_ps();
-                for (j = 0; j < thread_data->num_mini_chunks; j++) {
-                    if (i == j)
-                        continue;
-                    else{
-                        a = _mm256_set1_ps(thread_data->A.elements[i * thread_data->num_mini_chunks + j]);
-                        x = _mm256_load_ps(&src[VECTOR_SIZE * j]);
-                        tmp = _mm256_mul_ps(a, x);
-                        sum = _mm256_add_ps(sum, tmp);
-                        //sum += A.elements[i * num_cols + j] * src[j];
-                    }
-                }
-               
-                /* Update values for the unkowns for the current row. */
-                b = _mm256_set1_ps(thread_data->B.elements[i]);
-                a = _mm256_set1_ps(thread_data->A.elements[i * num_cols + i]);
-                tmp = _mm256_sub_ps(b, sum);
-                tmp = _mm256_div_ps(tmp, a);
-                _mm256_store_ps(&dest[VECTOR_SIZE * i], tmp);
-                //dest[i] = (B.elements[i] - sum)/A.elements[i * num_cols + i];
-            }
-    
-            /* Check for convergence and update the unknowns. */
-            for (i = 0; i < num_rows; i++) {
-                ssd += (dest[i] - src[i]) * (dest[i] - src[i]);
-            }
-            k = k + thread_data->num_threads;
+        // Split the work across multiple threads
+        int chunk_size = num_rows / num_threads;
+        for (i = 0; i < num_threads; i++) {
+            thread_data[i].start_row = i * chunk_size;
+            thread_data[i].end_row = (i == num_threads - 1) ? num_rows : (i + 1) * chunk_size;
+            thread_data[i].num_cols = num_cols;
+            thread_data[i].A_elements = A.elements;
+            thread_data[i].src = src;
+            thread_data[i].dest = dest;
+            thread_data[i].B_elements = B.elements;
+
+            pthread_create(&threads[i], NULL, iterative_jacobian, &thread_data[i]);
         }
-        
+
+        // Join all threads
+        for (i = 0; i < num_threads; i++) {
+            pthread_join(threads[i], NULL);
+        }
+
+        /* Check for convergence and update the unknowns. */
+        ssd = 0.0;
+        for (i = 0; i < num_rows; i++) {
+            float diff = dest[i] - src[i];
+            ssd += diff * diff;
+        }
 
         num_iter++;
+        mse = sqrt(ssd);  // Mean squared error
         //fprintf(stderr, "Iteration: %d. MSE = %f\n", num_iter, mse); 
-        pthread_mutex_lock(thread_data->mutex_for_ssd);
-        thread_data->ssd += ssd;
-        pthread_mutex_unlock(thread_data->mutex_for_ssd);
-        mse = sqrt(thread_data->ssd); /* Mean squared error. */
-        if ((mse <= THRESHOLD) || (num_iter == thread_data->max_iter))
+
+        if ((mse <= THRESHOLD) || (num_iter == max_iter))
             done = 1;
-        
+
         /* Flip the ping-pong buffers */
         temp = src;
         src = dest;
         dest = temp;
     }
-
-    /*if (num_iter < max_iter)
+        /*if (num_iter < max_iter)
         fprintf(stderr, "\nConvergence achieved after %d iterations\n", num_iter);
     else
         fprintf(stderr, "\nMaximum allowed iterations reached\n");*/
 
+
     free(new_x.elements);
-		  
+
+}
+
+void *iterative_jacobian(void *args)
+{
+    ThreadData *data = (ThreadData *)args;
+    int i, j;
+    int num_cols = data->num_cols;
+    __m256 sum, a, x, tmp, loaded_a_vec;
+    float *A, *src, *dest, *B;
+    A = data->A_elements;    // Vector A
+    src = data->src; // src vector
+    dest = data->dest; // unknowns vector
+    B = data->B_elements; // Vector B
+
+    for (i = data->start_row; i < data->end_row; i++) {
+        sum = _mm256_setzero_ps();  // Initialize sum vector to zero
+        a = _mm256_set1_ps(A[i * num_cols + i]);  // Broadcast A[i]
+
+        for (j = 0; j < num_cols; j += VECTOR_SIZE) {
+            loaded_a_vec = _mm256_loadu_ps(&A[i * num_cols + j]);  // Load A[i] with unaligned memory accounted for
+            x = _mm256_loadu_ps(&src[j]);  // Load the src vector
+            tmp = _mm256_mul_ps(loaded_a_vec, x);  // A[i] * src
+            sum = _mm256_add_ps(sum, tmp);  // Accumulate sum
+        }
+
+        // Horizontal sum of the elements in the sum vector using adjacent addition. Then cast to 32-bit floating point value
+        __m128 partial_sum = _mm_add_ps(_mm256_extractf128_ps(sum, 1), _mm256_castps256_ps128(sum));
+        partial_sum = _mm_hadd_ps(partial_sum, partial_sum);
+        partial_sum = _mm_hadd_ps(partial_sum, partial_sum);
+        float new_sum = _mm_cvtss_f32(partial_sum);
+
+        // Subtract the diagonal contribution
+        new_sum -= A[i * num_cols + i] * src[i];
+        /* Update values for the unknowns for the current row. */
+        dest[i] = (B[i] - new_sum) / A[i * num_cols + i];
+    }
+
     pthread_exit(NULL);
+
 }
 

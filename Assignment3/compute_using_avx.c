@@ -17,8 +17,7 @@ void compute_using_avx(const matrix_t A, matrix_t avx_solution_x, const matrix_t
     int i, j;
     int num_rows = A.num_rows;
     int num_cols = A.num_columns;
-    int num_chunks = num_rows/VECTOR_SIZE;
-
+    
     /* Allocate n x 1 matrix to hold iteration values.*/
     matrix_t new_x = allocate_matrix(num_rows, 1, 0);      
     
@@ -36,32 +35,31 @@ void compute_using_avx(const matrix_t A, matrix_t avx_solution_x, const matrix_t
     double ssd, mse;
     int num_iter = 0;
 
-    __m256 a, b, x, tmp;
+    __m256 a, sum, x, tmp, loaded_a_vec;
 
     while (!done) {
         // AVX in this loop?
-        for (i = 0; i < num_chunks; i++) {
-            //double sum = -A.elements[i * num_cols + i] * src[i];
-            __m256 sum = _mm256_setzero_ps();
-            for (j = 0; j < num_chunks; j++) {
-                if (i == j)
-                    continue;
-                else{
-                    a = _mm256_set1_ps(A.elements[i * num_chunks + j]);
-                    x = _mm256_load_ps(&src[VECTOR_SIZE * j]);
-                    tmp = _mm256_mul_ps(a, x);
-                    sum = _mm256_add_ps(sum, tmp);
-                    //sum += A.elements[i * num_cols + j] * src[j];
-                }
+        for (i = 0; i < num_rows; i++) {
+            sum = _mm256_setzero_ps();  // Initialize sum vector to zero
+            a = _mm256_set1_ps(A.elements[i * num_cols + i]);  // Broadcast A[i]
+    
+            for (j = 0; j < num_cols; j += VECTOR_SIZE) {
+                loaded_a_vec = _mm256_loadu_ps(&A.elements[i * num_cols + j]);  // Load A[i] with unaligned memory accounted for
+                x = _mm256_loadu_ps(&src[j]);  // Load the src vector
+                tmp = _mm256_mul_ps(loaded_a_vec, x);  // A[i] * src
+                sum = _mm256_add_ps(sum, tmp);  // Accumulate sum
             }
-           
-            /* Update values for the unkowns for the current row. */
-            b = _mm256_set1_ps(B.elements[i]);
-            a = _mm256_set1_ps(A.elements[i * num_cols + i]);
-            tmp = _mm256_sub_ps(b, sum);
-            tmp = _mm256_div_ps(tmp, a);
-            _mm256_store_ps(&dest[VECTOR_SIZE * i], tmp);
-            //dest[i] = (B.elements[i] - sum)/A.elements[i * num_cols + i];
+    
+            // Horizontal sum of the elements in the sum vector using adjacent addition. Then cast to 32-bit floating point value
+            __m128 partial_sum = _mm_add_ps(_mm256_extractf128_ps(sum, 1), _mm256_castps256_ps128(sum));
+            partial_sum = _mm_hadd_ps(partial_sum, partial_sum);
+            partial_sum = _mm_hadd_ps(partial_sum, partial_sum);
+            float new_sum = _mm_cvtss_f32(partial_sum);
+    
+            // Subtract the diagonal contribution
+            new_sum -= A.elements[i * num_cols + i] * src[i];
+            /* Update values for the unknowns for the current row. */
+            dest[i] = (B.elements[i] - new_sum) / A.elements[i * num_cols + i];
         }
 
         /* Check for convergence and update the unknowns. */
@@ -89,6 +87,7 @@ void compute_using_avx(const matrix_t A, matrix_t avx_solution_x, const matrix_t
         fprintf(stderr, "\nMaximum allowed iterations reached\n");*/
 
     free(new_x.elements);
+    
 }
 
 
