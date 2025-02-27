@@ -7,8 +7,8 @@
     Author: Naga Kandasamy
     Date modified: February 20, 2025
 
-    Student name(s): FIXME
-    Date modified: FIXME
+    Student name(s): Jeffrey Lau, Sotero Casiano
+    Date modified: 2/26/2025
 */
 
 #include <stdlib.h>
@@ -56,9 +56,15 @@ int main(int argc, char **argv)
         in.element[i] = rand()/(float)RAND_MAX -  0.5;
   
    /* Calculate the blur on the CPU. The result is stored in out_gold. */
-    fprintf(stderr, "Calculating blur on the CPU\n"); 
-    compute_gold(in, out_gold); 
+    fprintf(stderr, "Calculating blur on the CPU\n");
+    struct timeval start, stop;
 
+    gettimeofday(&start, NULL);
+    compute_gold(in, out_gold);
+    gettimeofday(&stop, NULL);
+    fprintf(stderr, "Execution time = %fs\n", (float)(stop.tv_sec - start.tv_sec +\
+        (stop.tv_usec - start.tv_usec)/(float)1000000));
+        
 #ifdef DEBUG 
    print_image(in);
    print_image(out_gold);
@@ -90,7 +96,38 @@ int main(int argc, char **argv)
 /* FIXME: Complete this function to calculate the blur on the GPU */
 void compute_on_device(const image_t in, image_t out)
 {
-    return;
+    image_t d_in = in;
+    image_t d_out = out;
+    int size = in.size * in.size * sizeof(float);
+
+    cudaMalloc((void**)&d_in.element, size);
+    cudaMalloc((void**)&d_out.element, size);
+    cudaMemcpy(d_in.element, in.element, size, cudaMemcpyHostToDevice);
+    //cudaMemcpy(d_out.element, out.element, size, cudaMemcpyHostToDevice);
+
+    dim3 thread_block(32, 32);
+    dim3 grid(in.size / 32, in.size / 32);
+
+    struct timeval start, stop;
+    gettimeofday(&start, NULL);
+
+    blur_filter_kernel<<<grid, thread_block>>>(d_in.element, d_out.element, in.size);
+    cudaDeviceSynchronize();
+
+    gettimeofday(&stop, NULL);
+	fprintf(stderr, "Kernel execution time = %fs\n", (float)(stop.tv_sec - start.tv_sec +\
+                                                     (stop.tv_usec - start.tv_usec)/(float)1000000));
+
+    cudaError_t err = cudaGetLastError(); 	    /* Check for error */
+	if (cudaSuccess != err) {
+		fprintf(stderr, "Kernel execution failed: %s\n", cudaGetErrorString(err));
+		exit(EXIT_FAILURE);
+	}
+
+    cudaMemcpy(out.element, d_out.element, size, cudaMemcpyDeviceToHost);
+
+    cudaFree(d_in.element);
+    cudaFree(d_out.element);
 }
 
 /* Check correctness of results */
