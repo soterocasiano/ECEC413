@@ -53,7 +53,27 @@ int main(int argc, char **argv)
 /* Complete this function to perform the trapezoidal rule on the GPU. */
 double compute_on_device(float a, float b, int n, float h)
 {
-    return 0.0;
+    float *d_global_sum;
+    float h_global_sum = 0.0f;
+
+    // Allocate memory on the GPU
+    cudaMalloc((void **)&d_global_sum, sizeof(float));
+    cudaMemcpy(d_global_sum, &h_global_sum, sizeof(float), cudaMemcpyHostToDevice);
+
+    // Define thread block and grid sizes
+    int threads_per_block = 256;
+    int blocks_per_grid = (n + threads_per_block - 1) / threads_per_block;
+
+    // Launch the kernel
+    trap_kernel<<<blocks_per_grid, threads_per_block, threads_per_block * sizeof(float)>>>(a, h, n, d_global_sum);
+
+    // Copy the result back to the host
+    cudaMemcpy(&h_global_sum, d_global_sum, sizeof(float), cudaMemcpyDeviceToHost);
+
+    // Free GPU memory
+    cudaFree(d_global_sum);
+
+    return (double)h_global_sum;
 }
 
 
