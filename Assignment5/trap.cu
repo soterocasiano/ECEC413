@@ -74,7 +74,7 @@ double compute_on_device(float a, float b, int n, float h)
 
     // Launch the kernel
     trap_kernel<<<blocks_per_grid, threads_per_block, threads_per_block * sizeof(float)>>>(a, b, n, h, d_global_sum);
-
+    cudaDeviceSynchronize();
     // Copy the result back to the host
     cudaMemcpy(&h_global_sum, d_global_sum, sizeof(float), cudaMemcpyDeviceToHost);
 
