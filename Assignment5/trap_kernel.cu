@@ -1,14 +1,14 @@
 /* GPU kernel to estimate integral of the provided function using the trapezoidal rule. */
 
-/* Device function which implements the function. Device functions can be called from within other __device__ functions or __global__ functions (the kernel), but cannot be called from the host. */ 
+/* Device function which implements the function. Device functions can be called from within other __device__ functions or __global__ functions (the kernel), but cannot be called from the host. */
 
-__device__ float fd(float x) 
+__device__ float fd(float x)
 {
      return sqrtf((1 + x*x)/(1 + x*x*x*x));
 }
 
 /* Kernel function */
-__global__ void trap_kernel(float a, float b, int n, float h) 
+__global__ void trap_kernel(float a, float b, int n, float h, float *global_val)
 {
      extern __shared__ float shared_sums[]; // shared memory for partial sums
     int tid = threadIdx.x;
@@ -33,7 +33,7 @@ __global__ void trap_kernel(float a, float b, int n, float h)
 
     // Accumulate the reduced value into global memory
     if (tid == 0) {
-        atomicAdd(global_sum, shared_sums[0]);
+        atomicAdd(global_val, shared_sums[0]);
     }
 
 }
